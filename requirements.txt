@@ -1,4 +1,4 @@
 streamlit
 whisper
+torch
 st-audiorec
-ffmpeg-python
