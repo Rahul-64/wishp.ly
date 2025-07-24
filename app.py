@@ -1,24 +1,27 @@
 import streamlit as st
 import whisper
+import sounddevice as sd
+from scipy.io.wavfile import write
+import numpy as np
 import tempfile
 import os
 
-from st_audiorec import st_audiorec
-
-# Ensure ffmpeg path is included (update this path if needed)
-if os.name == "nt":  # Only on Windows
-    os.environ["PATH"] += os.pathsep + r"C:\ffmpeg\ffmpeg-7.1.1-full_build\bin"
-
+# Ensure ffmpeg path is included (update if needed)
+os.environ["PATH"] += os.pathsep + r"C:\ffmpeg\ffmpeg-7.1.1-full_build\bin"
 
 # Page config
 st.set_page_config(page_title="🎤 Record or Upload & Transcribe", layout="centered")
-st.title("🎙️ Speech-to-Text")
+st.title("🎙️ Whisper Speech-to-Text")
 
 # ------------------- Sidebar Settings -------------------
 with st.sidebar:
     st.header("🔧 Settings")
     language = st.selectbox("Spoken Language", ["auto", "en", "hi", "es", "fr", "de", "ja", "zh"])
     model_size = st.selectbox("Whisper Model Size", ["base", "small", "medium"], index=1)
+    st.markdown("---")
+    st.subheader("🎤 Recorder Settings")
+    duration = st.slider("Recording Duration (seconds)", 1, 20, 5)
+    sample_rate = st.selectbox("Sample Rate (Hz)", [16000, 22050, 44100], index=0)
 
 # ------------------- Whisper Loader -------------------
 @st.cache_resource(show_spinner=False)
@@ -60,18 +63,21 @@ with tab1:
             finally:
                 os.remove(tmp_path)
 
-# ------------------- Microphone Recording UI -------------------
+# ------------------- Recorder UI -------------------
 with tab2:
-    st.subheader("🎤 Record Audio (Start/Stop manually)")
-    wav_audio_data = st_audiorec()
+    if st.button("⏺️ Start Recording"):
+        st.info("🎙️ Recording...")
+        audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype='int16')
+        sd.wait()
+        st.success("✅ Recording complete!")
 
-    if wav_audio_data is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav", mode="wb") as tmpfile:
-            tmpfile.write(wav_audio_data)
+            write(tmpfile.name, sample_rate, audio)
+            tmpfile.flush()
+            os.fsync(tmpfile.fileno())
             tmpfile_path = tmpfile.name
 
-        st.audio(wav_audio_data, format="audio/wav")
-
+        st.audio(tmpfile_path, format="audio/wav")
         with open(tmpfile_path, "rb") as f:
             st.download_button("⬇️ Download Audio", data=f.read(), file_name="recorded_audio.wav")
 
